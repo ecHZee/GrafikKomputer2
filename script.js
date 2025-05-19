@@ -310,18 +310,89 @@ window.addEventListener('DOMContentLoaded', function() {
                 bodyBobAnimation.setKeys(bodyBobKeys);
 
                 catBody.animations = [bodyBobAnimation];
+                
+
+                let inputMap = {};
+
+                scene.actionManager = new BABYLON.ActionManager(scene);
+                scene.actionManager.registerAction(
+                    new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyDownTrigger, function (evt) {
+                        inputMap[evt.sourceEvent.key.toLowerCase()] = true;
+                    })
+                );
+                scene.actionManager.registerAction(
+                    new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyUpTrigger, function (evt) {
+                        inputMap[evt.sourceEvent.key.toLowerCase()] = false;
+                    })
+                );
+
+
+                let isJumping = false;
+                let velocityY = 0;
+                let gravity = -0.02;
+                let groundLevel = 2; // Sama dengan posisi Y normal catRoot
+                
+                scene.onKeyboardObservable.add((kbInfo) => {
+                    if (kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN) {
+                        if (kbInfo.event.code === "Space" && !isJumping) {
+                            velocityY = 0.5;
+                            isJumping = true;
+                        }
+                    }
+                });
 
                 // 2. Gerakan seluruh kucing maju ke depan
                 var walkDistance = 10; // Jarak berjalan
                 var walkSpeed = 0.05; // Kecepatan berjalan, diperlambat dari 0.15 ke 0.05
 
-                scene.registerBeforeRender(function() {
-                    catRoot.position.z += walkSpeed;
 
-                    // Reset posisi kucing jika terlalu jauh
-                    if (catRoot.position.z > walkDistance) {
-                        catRoot.position.z = -walkDistance;
+                const respawnHeight = 10;      // Posisi Y tempat dia respawn
+                const fallThreshold = -10;     // Kalau dia jatuh lebih rendah dari ini, reset
+
+                scene.registerBeforeRender(function() {
+                    let moveSpeed = 0.1;
+
+                    if (inputMap["w"]) catRoot.position.z += moveSpeed;
+                    if (inputMap["s"]) catRoot.position.z -= moveSpeed;
+                    if (inputMap["a"]) catRoot.position.x -= moveSpeed;
+                    if (inputMap["d"]) catRoot.position.x += moveSpeed;
+
+                    const rayOrigin = catRoot.position.clone();
+                    const rayDirection = new BABYLON.Vector3(0, -1, 0);
+                    const rayLength = 2; // Jarak maksimal ray (sesuaikan)
+
+                    const ray = new BABYLON.Ray(rayOrigin, rayDirection, rayLength);
+                    const hit = scene.pickWithRay(ray, (mesh) => mesh === ground);
+
+                    const isGrounded = hit && hit.hit;
+                    
+                    if (!isGrounded || isJumping) {
+                        catRoot.position.y += velocityY;
+                        velocityY += gravity;
+
+                        if (isGrounded && velocityY < 0) {
+                            // Sudah menyentuh tanah, reset posisi dan status lompat
+                            catRoot.position.y = hit.pickedPoint.y;
+                            velocityY = 0;
+                            isJumping = false;
+                        }
                     }
+                    if (catRoot.position.y < fallThreshold) {
+                        // Reset posisi sementara ke atas dulu
+                        catRoot.position = new BABYLON.Vector3(0, respawnHeight, 0);
+                        velocityY = 0;
+                        isJumping = false;
+
+                        // Cek permukaan tanah di bawahnya
+                        const ray = new BABYLON.Ray(catRoot.position, new BABYLON.Vector3(0, -1, 0), 10);
+                        const hit = scene.pickWithRay(ray, (mesh) => mesh === ground);
+
+                        if (hit.hit) {
+                            catRoot.position.y = hit.pickedPoint.y; // Tempelkan langsung ke tanah
+                        }
+                    }
+  
+
                 });
 
                 // 3. Animasi kaki-kaki - lebih lambat
@@ -533,7 +604,7 @@ window.addEventListener('DOMContentLoaded', function() {
                     createGrassStrand(randomX, randomZ, randomHeight, randomThickness, randomRotation);
                 }
 
-                        // Interaksi: klik pada kucing untuk membuatnya melompat
+            // Interaksi: klik pada kucing untuk membuatnya melompat
             scene.onPointerDown = function (evt, pickResult) {
                 if (pickResult.hit && pickResult.pickedMesh && pickResult.pickedMesh.parent === catRoot) {
                     var jumpAnimation = new BABYLON.Animation(
