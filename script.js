@@ -533,6 +533,29 @@ window.addEventListener('DOMContentLoaded', function() {
                     createGrassStrand(randomX, randomZ, randomHeight, randomThickness, randomRotation);
                 }
 
+                        // Interaksi: klik pada kucing untuk membuatnya melompat
+            scene.onPointerDown = function (evt, pickResult) {
+                if (pickResult.hit && pickResult.pickedMesh && pickResult.pickedMesh.parent === catRoot) {
+                    var jumpAnimation = new BABYLON.Animation(
+                        "jump",
+                        "position.y",
+                        30,
+                        BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+                        BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+                    );
+
+                    var keys = [];
+                    keys.push({ frame: 0, value: catRoot.position.y });
+                    keys.push({ frame: 10, value: catRoot.position.y + 2 }); // loncat
+                    keys.push({ frame: 20, value: catRoot.position.y }); // kembali
+
+                    jumpAnimation.setKeys(keys);
+                    catRoot.animations = [jumpAnimation];
+
+                    scene.beginAnimation(catRoot, 0, 20, false);
+                }
+            };
+
                 return scene;
             };
 
